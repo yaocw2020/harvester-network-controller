@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"fmt"
-	"net"
 	"syscall"
 
 	"github.com/vishvananda/netlink"
@@ -43,7 +42,7 @@ func (br *Bridge) StartDHCPClientDaemon() {
 			continue
 		}
 
-		go br.dhcpClient.Start()
+		go br.dhcpClient.Start(false)
 	}
 
 	klog.Info("end dhcp daemon")
@@ -57,7 +56,7 @@ func (br *Bridge) DHCPHealthCheck() {
 	}
 
 	if len(addrList) != 0 && !br.dhcpClient.IsRunning() {
-		br.dhcpClient.Start()
+		br.dhcpClient.Start(true)
 	}
 }
 
@@ -155,13 +154,12 @@ func (br *Bridge) BorrowAddr(lender *Link, vidList []uint16) error {
 }
 
 func (br *Bridge) configAddr(src *Link) error {
-	ip, mask, _, err := br.dhcpClient.GetIPv4Addr()
+	addr, err := br.dhcpClient.GetIPv4Addr()
 	if err != nil {
 		return fmt.Errorf("%s get IPv4 address failed, error: %w", br.Name, err)
 	}
-	addr := &netlink.Addr{IPNet: &net.IPNet{IP: ip, Mask: mask}}
 	dst := &Link{Link: br.Bridge}
-	if err := netlink.AddrReplace(dst, addr); err != nil {
+	if err := netlink.AddrReplace(dst, &netlink.Addr{IPNet: &addr.IPNet}); err != nil {
 		return fmt.Errorf("could not add address, error: %w, link: %s", err, dst.Attrs().Name)
 	}
 
